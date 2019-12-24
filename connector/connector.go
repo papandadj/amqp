@@ -37,6 +37,11 @@ type Channel struct {
 	closed      int32
 }
 
+//SetDelay .
+func (c *Channel) SetDelay(delay time.Duration) {
+	c.delay = delay
+}
+
 // Close close channeland flag .
 func (c *Channel) Close() error {
 	if c.IsClosed() {
@@ -83,7 +88,7 @@ func Dial(url string) (*Connection, error) {
 	}
 
 	go connection.reConnector()
-	connection.log.Log("conn rabbit connected ..")
+	connection.log.Log("conn rabbit connected .. \n")
 	return connection, nil
 }
 
@@ -107,7 +112,7 @@ func (c *Connection) reConnector() {
 				go send2ConnCloseErr(c.notifyClose, err)
 			} else {
 				c.Connection = conn
-				c.log.Log("connection reConnector rabbit reconnected ..\n")
+				c.log.Log("connection reConnector rabbit reconnected .. \n")
 			}
 		}
 	}
@@ -141,7 +146,7 @@ func (c *Channel) reConnector(connection *Connection) {
 				go send2ConnCloseErr(c.notifyClose, err)
 			} else {
 				c.Channel = ch
-				connection.log.Log("channel reConnector rabbit channel reconnected ..\n")
+				connection.log.Log("channel reConnector rabbit channel reconnected .. \n")
 			}
 		}
 	}
@@ -154,7 +159,7 @@ func (c *Channel) Consume(queue, consumer string, autoAck, exclusive, noLocal, n
 		for {
 			msgs, err := c.Channel.Consume(queue, consumer, autoAck, exclusive, noLocal, noWait, args)
 			if err != nil {
-				c.connection.log.Log("consume consume err: %s\n", err)
+				c.connection.log.Log("consume consume err: %s \n", err)
 				time.Sleep(c.delay)
 				continue
 			}
