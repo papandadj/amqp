@@ -18,6 +18,16 @@ type Connection struct {
 	url         string
 }
 
+//SetLog .
+func (c *Connection) SetLog(log Logger) {
+	c.log = log
+}
+
+//SetDelay .
+func (c *Connection) SetDelay(delay time.Duration) {
+	c.delay = delay
+}
+
 //Channel channel wrapper
 type Channel struct {
 	*amqp.Channel
@@ -25,6 +35,25 @@ type Channel struct {
 	delay       time.Duration
 	connection  *Connection
 	closed      int32
+}
+
+// Close close channeland flag .
+func (c *Channel) Close() error {
+	if c.IsClosed() {
+		return amqp.ErrClosed
+	}
+
+	atomic.StoreInt32(&c.closed, int32(1))
+
+	return c.Channel.Close()
+}
+
+// IsClosed check channel is closed by user, not network error.
+func (c *Channel) IsClosed() bool {
+	if atomic.LoadInt32(&c.closed) != 0 {
+		return true
+	}
+	return false
 }
 
 // Logger .
@@ -37,24 +66,6 @@ type defaultLogger struct {
 
 func (d defaultLogger) Log(format string, a ...interface{}) {
 	fmt.Printf(format, a...)
-}
-
-//SetLog .
-func (c *Connection) SetLog(log Logger) {
-	c.log = log
-}
-
-//SetDelay .
-func (c *Connection) SetDelay(delay time.Duration) {
-	c.delay = delay
-}
-
-func dial(url string) (*amqp.Connection, error) {
-	conn, err := amqp.Dial(url)
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
 }
 
 //Dial accepts a string in the AMQP URI format and returns a new Connection
@@ -76,6 +87,14 @@ func Dial(url string) (*Connection, error) {
 	return connection, nil
 }
 
+func dial(url string) (*amqp.Connection, error) {
+	conn, err := amqp.Dial(url)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
 func (c *Connection) reConnector() {
 	for {
 		c.notifyClose = c.NotifyClose(make(chan *amqp.Error))
@@ -83,7 +102,6 @@ func (c *Connection) reConnector() {
 		case amqpErr, ok := <-c.notifyClose:
 			if conn, err := dial(c.url); err != nil {
 				c.log.Log("connection reConnector rabbit connect error : %v, channel status: %t \n", amqpErr, ok)
-				time.Sleep(c.delay)
 				c.notifyClose = make(chan *amqp.Error)
 				go send2ConnCloseErr(c.notifyClose, err)
 			} else {
@@ -122,7 +140,7 @@ func (c *Channel) reConnector(connection *Connection) {
 				go send2ConnCloseErr(c.notifyClose, err)
 			} else {
 				c.Channel = ch
-				connection.log.Log("channel reConnector rabbit reconnected ..\n")
+				connection.log.Log("channel reConnector rabbit channel reconnected ..\n")
 			}
 		}
 	}
@@ -158,23 +176,4 @@ func send2ConnCloseErr(notifyClose chan *amqp.Error, err error) {
 	notifyClose <- &amqp.Error{
 		Reason: err.Error(),
 	}
-}
-
-// Close close channeland flag .
-func (c *Channel) Close() error {
-	if c.IsClosed() {
-		return amqp.ErrClosed
-	}
-
-	atomic.StoreInt32(&c.closed, int32(1))
-
-	return c.Channel.Close()
-}
-
-// IsClosed check channel is closed by user, not network error.
-func (c *Channel) IsClosed() bool {
-	if atomic.LoadInt32(&c.closed) != 0 {
-		return true
-	}
-	return false
 }
