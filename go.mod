@@ -1,4 +1,4 @@
-module amqp
+module github.com/papandadj/amqp
 
 go 1.12
 
