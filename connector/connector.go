@@ -102,6 +102,7 @@ func (c *Connection) reConnector() {
 		case amqpErr, ok := <-c.notifyClose:
 			if conn, err := dial(c.url); err != nil {
 				c.log.Log("connection reConnector rabbit connect error : %v, channel status: %t \n", amqpErr, ok)
+				time.Sleep(c.delay)
 				c.notifyClose = make(chan *amqp.Error)
 				go send2ConnCloseErr(c.notifyClose, err)
 			} else {
